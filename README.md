@@ -42,8 +42,8 @@ These are custom BZDB variables that can be set in game in order to change the p
  * _ggSuicidePenalty - how many flags a player forfeits by suicide
  * _ggDetectCheat - whether or not to try to detect drop-shoot cheats
  * _ggCheatPenalty - how many flags a player forfeits if drop-shoot cheat is detected
- * _ggDebug - corresponds with parameter #3
- * _ggJacked  - corresponds with parameter #4
+ * _ggDebug - if enabled, sends debugging messages to everyone (or to player logged into IP passed in at start)
+ * _ggJacked  - if enabled, server announces all kills
 
 ## Notes
 
