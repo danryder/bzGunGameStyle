@@ -64,9 +64,10 @@ class FlagManager
 {
 private:
 
-    typedef map<int, int> WinnersListType;
     typedef map<int, int> AssignedFlagsType;
     typedef map<size_t, int> FlagLevelsType;
+    typedef map<int, int> WinnersListType;
+    typedef multimap<int, int, greater<int> > LeaderboardType;
     struct DelayedFlagType{
         DelayedFlagType(double t=0.0, const char *f=NULL)
                : givetime(t), flag(f) {}
@@ -74,42 +75,39 @@ private:
         const char *flag;
     };
 
-    typedef multimap<int, int, greater<int> > LeaderboardType;
-    WinnersListType WinnersList;
-    LeaderboardType Leaderboard;
+    AssignedFlagsType AssignedFlags; // flag# assigned by player ID
+    FlagLevelsType FlagLevels;       // flag levels of all enabled flags (by flag#)
+    WinnersListType WinnersList;     // total wins by player ID
+    LeaderboardType Leaderboard; // sorts winners at end of game
 
-    AssignedFlagsType AssignedFlags;
-    size_t numTotalFlags;
-    size_t minPlayers;
-    int firstFlag;
-    int lastFlag;
-    size_t numEnabledFlags;
-    FlagLevelsType flagLevels;      // levels of flags enabled
+    size_t numTotalFlags;        // #flags that could be enabled
+    size_t numEnabledFlags;      // #flags actually enabled
+    size_t minPlayers;           // min players for a game
+    int firstFlag;               // first flag enabled
+    int lastFlag;                // last flag enabled
 
+    // if #flags enabled changes (as players come and go), update info about
+    // enabled flags
     void recalcFlags()
     {
-        vector<size_t> flagOffsets;
-        flagLevels.clear();
+        firstFlag = -1;
+        lastFlag = -1;
+        FlagLevels.clear();
         numEnabledFlags = 0;
         for (size_t f = 0; f < numTotalFlags; ++f)
         {
             if (possibleFlags[f].playersRequired <= numPlayers)
             {
+                if (firstFlag < 0) firstFlag = f;
+                lastFlag = f;
                 numEnabledFlags++;
-                flagOffsets.push_back(f);
-                flagLevels[f] = numEnabledFlags;
+                FlagLevels[f] = numEnabledFlags;
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "Flag %3d (slot %u): %s", numEnabledFlags, f, possibleFlags[f].flagName);
             }
         }
-        
-        if (numEnabledFlags > 1)
-        {
-            firstFlag = flagOffsets[0];
-            lastFlag = flagOffsets[numEnabledFlags - 1];
-        }
     }
 
-    // if #flags changed (can happen as players come and go), update scores
+    // if #flags enabled changes (as players come and go), update player scores
     // handle case where a player has a flag now removed from circulation
     void recalcScores()
     {
@@ -117,8 +115,8 @@ private:
         {
             int playerID = i->first;
             int flag = i->second;
-            FlagLevelsType::iterator j = flagLevels.find(flag);
-            if (j != flagLevels.end())
+            FlagLevelsType::iterator j = FlagLevels.find(flag);
+            if (j != FlagLevels.end())
             {
                 // current flag was still in the list
                 // just update the score with the new position
@@ -130,8 +128,8 @@ private:
                 // replace it with preceeding valid flag
                 int decr = 0;
                 int newFlagNo = getPrevFlag(flag, decr, 1);
-                j = flagLevels.find(newFlagNo);
-                if (j != flagLevels.end())
+                j = FlagLevels.find(newFlagNo);
+                if (j != FlagLevels.end())
                 {
                     i->second = newFlagNo; // update what flag the player *should* have
                     bz_setPlayerWins(playerID, j->second);
@@ -207,8 +205,8 @@ private:
         return (numPlayersNeeded() <= 0);
     }
 
-
 public:
+    // members accessed in plugin class
     typedef map<int, DelayedFlagType> DelayedFlagsType;
     DelayedFlagsType DelayedFlags;
     size_t numPlayers;
@@ -221,8 +219,8 @@ public:
            numEnabledFlags(0),
            debuggerID(BZ_ALLUSERS)
     {
+        // count all flags, determine min #Players required
         numTotalFlags = 0;
-        // find min #Players required to actually play
         FlagOption *f = &possibleFlags[0];
         while (f && f->flagName)
         {
@@ -256,11 +254,10 @@ public:
 
         if (gameOn())
         {
-            int firstFlag = getNextFlag(-1);
             int numFlags = numEnabledFlags;
             if (!wasGameOn)
             {
-                Begin(firstFlag);
+                Begin();
                 start = true;
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                             "\"GunGame Style\" started with %d players %d flags",
@@ -390,7 +387,7 @@ public:
          bz_freePlayerRecord(pr);
     }
 
-    void Begin(const int firstFlag)
+    void Begin()
     {
         // new game -- pass out flags to anyone spawned
         const char *firstFlagName = possibleFlags[firstFlag].flagName;
@@ -497,7 +494,7 @@ public:
         // reduce player score on suicide
         if (decr)
         {
-            bz_setPlayerWins(dieData->playerID, flagLevels[newFlagNo]);
+            bz_setPlayerWins(dieData->playerID, FlagLevels[newFlagNo]);
         }
     }
 
@@ -551,7 +548,7 @@ public:
             AssignedFlags[dieData->killerID] = newFlagNo;
             // negate cheater score increase
             // and roll it back 
-            bz_setPlayerWins(dieData->killerID, flagLevels[newFlagNo] - 1);
+            bz_setPlayerWins(dieData->killerID, FlagLevels[newFlagNo] - 1);
             // if cheater died, do nothing - new flag will be given on spawn
             replaceFlagIfAlive(dieData->killerID, newFlag, "suspected cheat", true);
             bz_sendTextMessagef(BZ_SERVER, dieData->killerID, "WARNING: Try *not* to shoot between flags.");
@@ -569,7 +566,7 @@ public:
                                     victimName, killerName, killerFlag);
             }
 
-            int killerLevel = flagLevels[killerFlagNo];
+            int killerLevel = FlagLevels[killerFlagNo];
             int maxLevel = numEnabledFlags;
             int remainLevels = maxLevel - killerLevel;
 
@@ -602,7 +599,7 @@ public:
                 {
                     bz_sendTextMessagef(BZ_SERVER, debuggerID,
                                     "-> ATTENTION: %s made a legit kill. new flag is %d which is level %d",
-                                    killerName, newFlagNo, flagLevels[newFlagNo]);
+                                    killerName, newFlagNo, FlagLevels[newFlagNo]);
                 }
                 AssignedFlags[killerID] = newFlagNo;
                 const char *newFlag = possibleFlags[newFlagNo].flagName;
@@ -627,6 +624,7 @@ public:
                 {
                     i->second += 1;
                 }
+
                 Leaderboard.clear();
                 for (i = WinnersList.begin(); i != WinnersList.end(); ++i)
                 {
@@ -741,15 +739,19 @@ void GunGame::Event ( bz_EventData *eventData )
         for (FlagManager::DelayedFlagsType::iterator i = flagManager->DelayedFlags.begin();
              i != flagManager->DelayedFlags.end(); ++i)
         {
-            if (i->second.flag)
+            if (tickData->eventTime > i->second.givetime)
             {
-                if (tickData->eventTime > i->second.givetime)
+                // timer has expired - try to give the flag now
+                // if that still fails, reset timer
+                if (i->second.flag)
                 {
-                    // timer has expired - try to give the flag now
-                    // if that still fails, reset timer
-                    if (flagManager->givePlayerFlag(i->first, i->second.flag))
+                    if (flagManager->givePlayerFlagNow(i->first, i->second.flag))
                     {
-                        i->second.flag = NULL;
+                        // i->second.flag = NULL;
+                        flagManager->DelayedFlags.erase(i);
+                    }
+                    else
+                    {
                         i->second.givetime = tickData->eventTime + RETRYSEC;
                     }
                 }
@@ -892,7 +894,6 @@ void GunGame::Event ( bz_EventData *eventData )
     {
         bz_PlayerSpawnEventData_V1 *playerData = (bz_PlayerSpawnEventData_V1*)eventData;
         const char *shouldHave = flagManager->getAssignedFlag(playerData->playerID);
-        bz_sendTextMessagef(BZ_SERVER, playerData->playerID, "Spawning with %s", shouldHave);
         flagManager->givePlayerFlag(playerData->playerID, shouldHave);
         bz_sendTextMessagef(BZ_SERVER, playerData->playerID, "Spawned with %s", shouldHave);
 #ifdef PLAYSOUNDS
