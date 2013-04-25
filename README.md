@@ -15,14 +15,17 @@ Suicide results in going back one level.
 ## Compiling
 Add this plug-in to the BZFlag build system and compile.  From "plugins" directory:
 
-First time only:
+Create support files, check out code. First time only:
 
     sh newplug.sh gunGame
     cd gunGame
-    git clone https://github.com/danryder/bzGunGameStyle.git
-    ln -s bzGunGameStyle/gunGame.cpp
+    git clone https://github.com/danryder/bzGunGameStyle.git src
+    rm -f gunGame.cpp
+    ln -s src/gunGame.cpp
+    cd ..
+    make
     
-And then (or after any change to the source):
+After any change to the source, just rebuild in gunGame directory:
 
     make
     sudo make install
