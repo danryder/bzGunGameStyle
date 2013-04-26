@@ -146,16 +146,16 @@ private:
     }
 
     // flag progression
-    int getNextFlag(int oldFlag, int &num, int count=1)
+    int getNextFlag(int oldFlag, int &delta, int count=1)
     {
         int c = 0;
-        num = 0;
+        delta = 0;
         if (oldFlag >= lastFlag) return lastFlag;
         for (int f = oldFlag+1; f < numTotalFlags; ++f)
         {
             if (possibleFlags[f].playersRequired <= numPlayers)
             {
-                num += 1;
+                delta += 1;
                 if ((++c==count) || (f == lastFlag))
                 {
                     return f;
@@ -166,16 +166,16 @@ private:
     }
 
     // flag regression
-    int getPrevFlag(int oldFlag, int &num, int count=1)
+    int getPrevFlag(int oldFlag, int &delta, int count=1)
     {
         int c = 0;
-        num = 0;
+        delta = 0;
         if (oldFlag <= firstFlag) return firstFlag;
         for (int f = oldFlag-1; f >= 0; --f)
         {
             if (possibleFlags[f].playersRequired <= numPlayers)
             {
-                num += 1;
+                delta += 1;
                 if ((++c==count) || (f == firstFlag))
                 {
                     return f;
@@ -361,30 +361,40 @@ public:
 
     void replaceFlagIfAlive(int playerID, const char *flagName, const char *reason, bool tryFast=false)
     {
-         bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-         if (pr)
-         {
-             if (pr->spawned) 
+        const char *playerName = bz_getPlayerCallsign(playerID);
+        if (playerName)
+        {
+             bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
+             if (pr && pr->spawned)
              {
+                 bz_removePlayerFlag(playerID);
                  if (flagName)
                  {
-                     bz_removePlayerFlag(playerID);
                      if (tryFast) 
                          givePlayerFlag(playerID, flagName);
                      else
                          givePlayerFlagDelayed(playerID, flagName);
                  }
              }
-         }
-         else
-         {
+             else
+             {
+                 bz_sendTextMessagef(BZ_SERVER, debuggerID, 
+                 "ERROR: NO PLAYER RECORD (for '%s', player ID %d) can't replace %s's flag with %s",
+                 reason,
+                 playerName, playerID,
+                 (flagName) ? flagName : "nothing");
+             }
+             bz_freePlayerRecord(pr);
+        }
+        else
+        {
+             // this may have happened at end of game when we kill losers to reset
              bz_sendTextMessagef(BZ_SERVER, debuggerID, 
-             "ERROR: NO PLAYER RECORD (for %s) can't replace %s's flag with %s",
+             "For '%s', tried to replace player ID %d flag with %s, but no callsign exists",
              reason,
-             bz_getPlayerCallsign(playerID),
+             playerID,
              (flagName) ? flagName : "nothing");
-         }
-         bz_freePlayerRecord(pr);
+        }
     }
 
     void Begin()
@@ -507,13 +517,11 @@ public:
         const char *killerName = bz_getPlayerCallsign(killerID);
         int victimFlagNo = AssignedFlags[victimID];
         int killerFlagNo = AssignedFlags[dieData->killerID];
-        int killerPrevFlagNo = getPrevFlag(killerFlagNo, 1);
         const char *victimFlag = possibleFlags[victimFlagNo].flagName;
         const char *killerFlag = possibleFlags[killerFlagNo].flagName;
-        const char *killerPrevFlag = possibleFlags[killerPrevFlagNo].flagName;
 
         // detect possible cheater drop-kill, or inconsistent flag holder
-        // check for valid cases where flagKilledWith can be empty:
+        // allow valid cases where flagKilledWith can be empty:
         //  1 SR (squish)
         //  2 BU (squish) - could also check data->state.pos[2] >= 0
         if (bz_getBZDBBool("_ggDetectCheat") &&
@@ -523,8 +531,7 @@ public:
         {
             if (bz_getBZDBBool("_ggDebug"))
             {
-                bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed with flag: \"%s\"",
-                                dieData->flagKilledWith.c_str());
+                bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed without flag, not SR or BU.");
             }
             // if someone spams the drop flag key and squeezes of a shot with no flag
             // ... and if we don't succeed in making the bullet PZ
@@ -539,13 +546,12 @@ public:
             const char *newFlag = possibleFlags[newFlagNo].flagName;
             bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
                                 killerName, victimName, killerFlag, newFlag);
-            AssignedFlags[dieData->killerID] = newFlagNo;
+            AssignedFlags[killerID] = newFlagNo;
             // negate cheater score increase
             // and roll it back 
-            bz_setPlayerWins(dieData->killerID, FlagLevels[newFlagNo] - 1);
+            bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
             // if cheater died, do nothing - new flag will be given on spawn
-            replaceFlagIfAlive(dieData->killerID, newFlag, "suspected cheat", true);
-            bz_sendTextMessagef(BZ_SERVER, dieData->killerID, "WARNING: Try *not* to shoot between flags.");
+            replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
         }
         else
         {
@@ -592,6 +598,9 @@ public:
                                     killerName, newFlagNo, FlagLevels[newFlagNo]);
                 }
                 AssignedFlags[killerID] = newFlagNo;
+
+                // set score to new level (minus one to account for pending increment)
+                bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
                 const char *newFlag = possibleFlags[newFlagNo].flagName;
                 bz_sendTextMessagef(BZ_SERVER, killerID, "\"Upgraded\" from %s to %s (%d/%d)", killerFlag, newFlag, killerLevel+1, maxLevel);
 #ifdef PLAYSOUNDS
@@ -636,7 +645,7 @@ public:
                     int playerID = i->first;
                     int flag = i->second;
                     // reset scores
-                    bz_setPlayerWins(i->first, 1);
+                    bz_setPlayerWins(i->first, 0); // will increment to 1 due to kill
                     bz_setPlayerLosses(i->first, 0);
                     bz_setPlayerTKs(i->first, 0);
                     i->second = firstFlag;
