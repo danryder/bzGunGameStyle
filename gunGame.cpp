@@ -180,7 +180,7 @@ private:
                 {
                     return f;
                 }
-           }
+            }
         }
         return -1;
     }
@@ -517,10 +517,9 @@ public:
         //  1 SR (squish)
         //  2 BU (squish) - could also check data->state.pos[2] >= 0
         if (bz_getBZDBBool("_ggDetectCheat") &&
-            ((dieData->flagKilledWith.size() == 0) ||
-            ((dieData->flagKilledWith != killerFlag) && 
-             (dieData->flagKilledWith != killerPrevFlag))) &&
-            (string(killerFlag) != "SR") && (string(victimFlag) != "BU"))
+            (dieData->flagKilledWith.size() == 0) &&
+            (string(killerFlag) != "SR") && 
+            (string(victimFlag) != "BU"))
         {
             if (bz_getBZDBBool("_ggDebug"))
             {
@@ -540,11 +539,6 @@ public:
             const char *newFlag = possibleFlags[newFlagNo].flagName;
             bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
                                 killerName, victimName, killerFlag, newFlag);
-            if (dieData->flagKilledWith.size())
-            {
-                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "Side note: %s WAS killed with %s!",
-                                    victimName, dieData->flagKilledWith.c_str());
-            }
             AssignedFlags[dieData->killerID] = newFlagNo;
             // negate cheater score increase
             // and roll it back 
@@ -555,10 +549,6 @@ public:
         }
         else
         {
-            if ((dieData->flagKilledWith != killerFlag) && (dieData->flagKilledWith != killerPrevFlag))
-            {
-                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "NOT A CHEAT - player killed with killers old %s flag", killerPrevFlag);
-            }
             // legit kill!
             if (bz_getBZDBBool("_ggJacked"))
             {
