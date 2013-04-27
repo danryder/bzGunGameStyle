@@ -38,6 +38,8 @@ In your map have one of each flag for each allowed player.  I have found that up
 
 This works best if you edit your map to make all the flags spawn out of sight.  For example, in a box off the map or way up high.
 
+See mapchanges.txt for something you can paste into your map.
+
 ### Running
     bzfs -loadplugin /path/to/gunGame.so,ipaddr
 
