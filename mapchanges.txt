@@ -1,0 +1,54 @@
+# GunGame map changes
+#
+# GunGame assigns flags to players
+# currently, flags must exist in world to be assigned
+# as in, they can't be created out of thin are on demand
+#
+# Paste this into your .bzw file to create:
+# 1) a zone for all flags to spawn, up high and in one spot
+# 2) a box for them to land on, up high and out of sight
+# The box is at 0,0 and high up, so it will probably just work
+# for most maps
+# 
+# NOTE: you really want to have one of each flag for all
+#       possible players (below, 12)
+#       Limit the total players with "-sp 12"
+
+box
+name flaghider
+position -1 -1 600
+rotation 0
+size 2 2 .5
+end
+
+zone
+   name flagzone
+   size 1.0 1.0 11
+   pos -0.5 -0.5 601
+   zoneflag L 12
+   zoneflag GM 12
+   zoneflag SW 12
+   zoneflag CL 12
+   zoneflag F 12
+   zoneflag IB 12
+   zoneflag A 12
+   zoneflag MG 12
+   zoneflag ST 12
+   zoneflag T 12
+   zoneflag SB 12
+   zoneflag V 12
+   zoneflag OO 12
+   zoneflag BU 12
+   zoneflag WG 12
+   zoneflag QT 12
+   zoneflag M 12
+   zoneflag O 12
+   zoneflag WA 12
+   zoneflag RC 12
+   zoneflag B 12
+   zoneflag RT 12
+   zoneflag LT 12
+   zoneflag JM 12
+   zoneflag NJ 12
+   zoneflag SR 12
+end
