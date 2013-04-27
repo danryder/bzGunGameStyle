@@ -390,40 +390,30 @@ public:
 
     void replaceFlagIfAlive(int playerID, const char *flagName, const char *reason, bool tryFast=false)
     {
-        const char *playerName = bz_getPlayerCallsign(playerID);
-        if (playerName)
-        {
-             bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
-             if (pr && pr->spawned)
+         bz_BasePlayerRecord *pr = bz_getPlayerByIndex(playerID);
+         if (pr)
+         {
+             if (pr->spawned) 
              {
-                 bz_removePlayerFlag(playerID);
                  if (flagName)
                  {
+                     bz_removePlayerFlag(playerID);
                      if (tryFast) 
                          givePlayerFlag(playerID, flagName);
                      else
                          givePlayerFlagDelayed(playerID, flagName);
                  }
              }
-             else
-             {
-                 bz_sendTextMessagef(BZ_SERVER, debuggerID, 
-                 "ERROR: NO PLAYER RECORD (for '%s', player ID %d) can't replace %s's flag with %s",
-                 reason,
-                 playerName, playerID,
-                 (flagName) ? flagName : "nothing");
-             }
-             bz_freePlayerRecord(pr);
-        }
-        else
-        {
-             // this may have happened at end of game when we kill losers to reset
+         }
+         else
+         {
              bz_sendTextMessagef(BZ_SERVER, debuggerID, 
-             "For '%s', tried to replace player ID %d flag with %s, but no callsign exists",
+             "ERROR: NO PLAYER RECORD (for '%s', player ID %d) can't replace %s's flag with %s",
              reason,
-             playerID,
+             playerID, bz_getPlayerCallsign(playerID),
              (flagName) ? flagName : "nothing");
-        }
+         }
+         bz_freePlayerRecord(pr);
     }
 
     void Begin()
