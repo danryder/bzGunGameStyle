@@ -395,9 +395,9 @@ public:
          {
              if (pr->spawned) 
              {
+                 bz_removePlayerFlag(playerID);
                  if (flagName)
                  {
-                     bz_removePlayerFlag(playerID);
                      if (tryFast) 
                          givePlayerFlag(playerID, flagName);
                      else
