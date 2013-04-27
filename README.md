@@ -28,34 +28,35 @@ After any change to the source, just rebuild in gunGame directory:
 
     make
     sudo make install
-
+    
 ## Setup
 
+### Map Requirements
+This plugin handles assigning players flags.  There are 23 flags it can assign, and so any map must have enough of each flag so that a flag give never fails.
+
+In your map have one of each flag for each allowed player.  I have found that up to 12 players currently works, provided you also supply 12 of each of the 23 flags.
+
+This works best if you edit your map to make all the flags spawn out of sight.  For example, in a box off the map or way up high.
+
+### Running
     bzfs -loadplugin /path/to/gunGame.so,ipaddr
 
-### Parameters
  1. [ipaddress] If provided, an IP address from which connecting players will be given debug messages.
 
 ### BZDB Variables
 These are custom BZDB variables that can be set in game in order to change the plug-in's functionality.
 
- * _ggSuicidePenalty - how many flags a player forfeits by suicide
- * _ggDetectCheat - whether or not to try to detect drop-shoot cheats
- * _ggCheatPenalty - how many flags a player forfeits if drop-shoot cheat is detected
- * _ggDebug - if enabled, sends debugging messages to everyone (or to player logged into IP passed in at start)
- * _ggJacked  - if enabled, server announces all kills
+ * _ggSuicidePenalty - how many flags a player forfeits by suicide. defaults to 1 level
+ * _ggDetectCheat - whether or not to try to detect drop-shoot cheats. defaults to true
+ * _ggCheatPenalty - how many flags a player forfeits if drop-shoot cheat is detected. defaults to 3 levels
+ * _ggDebug - if enabled, sends debugging messages to everyone (or to player logged into IP passed in at start). defaults false.
+ * _ggJacked  - if enabled, server announces all kills.  defaults false
 
 ## Notes
 
-This works best if you edit your map to make all the flags spawn out of sight.  For example, in a box off the map or way up high.
-
-You will need to have 'n' of each flag defined in the map, where 'n' is the #players you intend to have.
-
-This will allow all the players to be on the same level at the same time.
-
 ## License
 
-lGPL
+BSD
 
 ## Thanks To (no particular order)
  * JeffM
