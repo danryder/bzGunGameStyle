@@ -789,7 +789,6 @@ void GunGame::Event ( bz_EventData *eventData )
                 // so we catch ill-gotten kills elsewhere and dispense justice there
                 shotData->type = "PZ";
                 shotData->changed = true;
-                bz_sendTextMessagef(BZ_SERVER, shotData->playerID, "WARNING: Try *not* to shoot between flags.");
                 if (bz_getBZDBBool("_ggDebug"))
                 {
                     bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID,
