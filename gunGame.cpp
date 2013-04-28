@@ -25,6 +25,9 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
+// TODO:  fix spam messages at the end
+//        print scoreboard at end
+
 // gunGame.cpp
 // for updates, see: https://github.com/danryder/bzGunGameStyle
 
@@ -546,38 +549,44 @@ public:
         const char *victimFlag = possibleFlags[victimFlagNo].flagName;
         const char *killerFlag = possibleFlags[killerFlagNo].flagName;
 
-        // detect possible cheater drop-kill, or inconsistent flag holder
+        // if someone spams the drop flag key and squeezes of a shot with no flag
+        // ... and if we don't succeed in making the bullet PZ
+        // ... and this results in another player dying
+        // demote and publicly shame the cheater
         // allow valid cases where flagKilledWith can be empty:
         //  1 SR (squish)
         //  2 BU (squish) - could also check data->state.pos[2] >= 0
-        if (bz_getBZDBBool("_ggDetectCheat") &&
-            (dieData->flagKilledWith.size() == 0) &&
-            (string(killerFlag) != "SR") && 
-            (string(victimFlag) != "BU"))
+        if (bz_getBZDBBool("_ggDetectCheat"))
         {
-            if (bz_getBZDBBool("_ggDebug"))
+            if (dieData->flagKilledWith.size() == 0)
             {
-                bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed without flag, not SR or BU.");
+                if ((string(killerFlag) != "SR") && (string(victimFlag) != "BU"))
+                {
+                    if (bz_getBZDBBool("_ggDebug"))
+                    {
+                        bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed without flag, not SR or BU.");
+                    }
+                    // if victim Z < 0, was coming out of BU -- not a cheat
+                    if (dieData->state.pos[2] >= 0)
+                    {
+                        int decr = 0;
+                        int newFlagNo = getPrevFlag(killerFlagNo, decr, bz_getBZDBInt("_ggCheatPenalty"));
+                        if (newFlagNo < 0)
+                        {
+                            newFlagNo = firstFlag;
+                        }
+                        const char *newFlag = possibleFlags[newFlagNo].flagName;
+                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
+                                            killerName, victimName, killerFlag, newFlag);
+                        AssignedFlags[killerID] = newFlagNo;
+                        // negate cheater score increase
+                        // and roll it back 
+                        bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
+                        // if cheater died, do nothing - new flag will be given on spawn
+                        replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
+                    }
+                }
             }
-            // if someone spams the drop flag key and squeezes of a shot with no flag
-            // ... and if we don't succeed in making the bullet PZ
-            // ... and this results in another player dying
-            // demote and publicly shame the cheater
-            int decr = 0;
-            int newFlagNo = getPrevFlag(killerFlagNo, decr, bz_getBZDBInt("_ggCheatPenalty"));
-            if (newFlagNo < 0)
-            {
-                newFlagNo = firstFlag;
-            }
-            const char *newFlag = possibleFlags[newFlagNo].flagName;
-            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
-                                killerName, victimName, killerFlag, newFlag);
-            AssignedFlags[killerID] = newFlagNo;
-            // negate cheater score increase
-            // and roll it back 
-            bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
-            // if cheater died, do nothing - new flag will be given on spawn
-            replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
         }
         else
         {
@@ -799,7 +808,6 @@ void GunGame::Event ( bz_EventData *eventData )
                 // so we catch ill-gotten kills elsewhere and dispense justice there
                 shotData->type = "PZ";
                 shotData->changed = true;
-                bz_sendTextMessagef(BZ_SERVER, shotData->playerID, "WARNING: Try *not* to shoot between flags.");
                 if (bz_getBZDBBool("_ggDebug"))
                 {
                     bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID,
