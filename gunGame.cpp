@@ -844,7 +844,7 @@ void GunGame::Event ( bz_EventData *eventData )
                 {
                     shotData->type = "PZ";
                     shotData->changed = true;
-                    bz_sendTextMessagef(BZ_SERVER, shotData->playerID, "Nope - you gotta smush 'em to win!");
+                    bz_sendTextMessagef(BZ_SERVER, shotData->playerID, "Shots don't work; You gotta crush someone to win");
                 }
             }
         }
