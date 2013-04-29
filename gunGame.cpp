@@ -548,34 +548,40 @@ public:
         bool cheat = false;
         if (bz_getBZDBBool("_ggDetectCheat"))
         {
+            // was there no flag?
             if (dieData->flagKilledWith.size() == 0)
             {
-                if ((string(killerFlag) != "SR") && (string(victimFlag) != "BU"))
+                // exempt server and admin
+                // those are always "OK"
+                if ((killerID != 253) && (killerID != 252))
                 {
-                    if (bz_getBZDBBool("_ggDebug"))
+                    if ((string(killerFlag) != "SR") && (string(victimFlag) != "BU"))
                     {
-                        bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed without flag, not SR or BU.");
-                    }
-                    // if victim Z < 0, was coming out of BU -- not a cheat
-                    if (dieData->state.pos[2] >= 0)
-                    {
-                        // this is as sure as we can be that "cheat" happened
-                        cheat = true;
-                        int decr = 0;
-                        int newFlagNo = getPrevFlag(killerFlagNo, decr, bz_getBZDBInt("_ggCheatPenalty"));
-                        if (newFlagNo < 0)
+                        if (bz_getBZDBBool("_ggDebug"))
                         {
-                            newFlagNo = firstFlag;
+                            bz_sendTextMessagef(BZ_SERVER, debuggerID, "Possible cheating? Killed without flag, not SR or BU.");
                         }
-                        const char *newFlag = possibleFlags[newFlagNo].flagName;
-                        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
-                                            killerName, victimName, killerFlag, newFlag);
-                        AssignedFlags[killerID] = newFlagNo;
-                        // negate cheater score increase
-                        // and roll it back 
-                        bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
-                        // if cheater died, do nothing - new flag will be given on spawn
-                        replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
+                        // if victim Z < 0, was coming out of BU -- not a cheat
+                        if (dieData->state.pos[2] >= 0)
+                        {
+                            // this is as sure as we can be that "cheat" happened
+                            cheat = true;
+                            int decr = 0;
+                            int newFlagNo = getPrevFlag(killerFlagNo, decr, bz_getBZDBInt("_ggCheatPenalty"));
+                            if (newFlagNo < 0)
+                            {
+                                newFlagNo = firstFlag;
+                            }
+                            const char *newFlag = possibleFlags[newFlagNo].flagName;
+                            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
+                                                killerName, victimName, killerFlag, newFlag);
+                            AssignedFlags[killerID] = newFlagNo;
+                            // negate cheater score increase
+                            // and roll it back 
+                            bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
+                            // if cheater died, do nothing - new flag will be given on spawn
+                            replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
+                        }
                     }
                 }
             }
