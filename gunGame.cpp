@@ -490,7 +490,15 @@ public:
 
     const char *getAssignedFlag(const int playerID)
     {
-        return possibleFlags[AssignedFlags[playerID]].flagName;
+        AssignedFlagsType::const_iterator i = AssignedFlags.find(playerID);
+        if (i == AssignedFlags.end())
+        {
+            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
+                                "Whoops - player %d had no assigned flag",
+                                playerID);
+            return NULL;
+        }
+        return possibleFlags[i->second].flagName;
     }
 
     // suicide or natural causes
@@ -795,7 +803,7 @@ void GunGame::Event ( bz_EventData *eventData )
     {
         bz_ShotFiredEventData_V1 *shotData = (bz_ShotFiredEventData_V1*)eventData;
         const char *shootingPlayer = bz_getPlayerCallsign(shotData->playerID);
-        
+
         bz_BasePlayerRecord *pr = bz_getPlayerByIndex(shotData->playerID);
         if (pr)
         {
@@ -867,29 +875,32 @@ void GunGame::Event ( bz_EventData *eventData )
                 // player dropped while alive
                 const char *droppedFlag = bz_getFlagName(playerData->flagID).c_str();
                 const char *shouldHave = flagManager->getAssignedFlag(playerData->playerID);
-                if (0 == strncmp(droppedFlag, shouldHave, strlen(droppedFlag)))
+                if (shouldHave)
                 {
-                    if (bz_getBZDBBool("_ggDebug"))
+                    if (0 == strncmp(droppedFlag, shouldHave, strlen(droppedFlag)))
                     {
-                        bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID, "%s dropped %s while alive", dropPlayer, droppedFlag);
+                        if (bz_getBZDBBool("_ggDebug"))
+                        {
+                            bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID, "%s dropped %s while alive", dropPlayer, droppedFlag);
+                        }
+                        // happens if a player dies (before die event)
+                        // OR if they try to drop their flag
+                        // either way, give them that flag back
+                        bool res = flagManager->givePlayerFlag(playerData->playerID, droppedFlag);
+                        if (bz_getBZDBBool("_ggDebug"))
+                        {
+                            bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID, "Immediate re-gift success? %s", res ? "yes" : "no");
+                        }
                     }
-                    // happens if a player dies (before die event)
-                    // OR if they try to drop their flag
-                    // either way, give them that flag back
-                    bool res = flagManager->givePlayerFlag(playerData->playerID, droppedFlag);
-                    if (bz_getBZDBBool("_ggDebug"))
+                    else if (bz_getBZDBBool("_ggDebug"))
                     {
-                        bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID, "Immediate re-gift success? %s", res ? "yes" : "no");
+                        // happens if plugin removed their flag
+                        // after upgrading state to a new one
+                        // plugin will also assign next flag
+                        bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID,
+                                            "%s dropped: %s to upgrade to: %s",
+                                            dropPlayer, droppedFlag, shouldHave);
                     }
-                }
-                else if (bz_getBZDBBool("_ggDebug"))
-                {
-                    // happens if plugin removed their flag
-                    // after upgrading state to a new one
-                    // plugin will also assign next flag
-                    bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID,
-                                        "%s dropped: %s to upgrade to: %s",
-                                        dropPlayer, droppedFlag, shouldHave);
                 }
             }
         }
@@ -925,11 +936,14 @@ void GunGame::Event ( bz_EventData *eventData )
     {
         bz_PlayerSpawnEventData_V1 *playerData = (bz_PlayerSpawnEventData_V1*)eventData;
         const char *shouldHave = flagManager->getAssignedFlag(playerData->playerID);
-        flagManager->givePlayerFlag(playerData->playerID, shouldHave);
-        bz_sendTextMessagef(BZ_SERVER, playerData->playerID, "Spawned with %s", shouldHave);
+        if (shouldHave)
+        {
+            flagManager->givePlayerFlag(playerData->playerID, shouldHave);
+            bz_sendTextMessagef(BZ_SERVER, playerData->playerID, "Spawned with %s", shouldHave);
 #ifdef PLAYSOUNDS
-        // bz_sendPlayCustomLocalSound(playerData->playerID, "gungame/gungame_boost");
+            // bz_sendPlayCustomLocalSound(playerData->playerID, "gungame/gungame_boost");
 #endif
+        }
     }
 
     else if (eventData->eventType == bz_ePlayerJoinEvent)
