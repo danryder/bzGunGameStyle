@@ -493,9 +493,6 @@ public:
         AssignedFlagsType::const_iterator i = AssignedFlags.find(playerID);
         if (i == AssignedFlags.end())
         {
-            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
-                                "Whoops - player %d had no assigned flag",
-                                playerID);
             return NULL;
         }
         return possibleFlags[i->second].flagName;
