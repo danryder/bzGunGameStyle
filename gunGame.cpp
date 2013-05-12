@@ -804,16 +804,15 @@ void GunGame::Event ( bz_EventData *eventData )
         for (FlagManager::DelayedFlagsType::iterator i = flagManager->DelayedFlags.begin();
              i != e; ++i)
         {
-            if (tickData->eventTime > i->second.givetime)
+            if (i->second.flag)
             {
+                if (tickData->eventTime > i->second.givetime)
+                {
                 // timer has expired - try to give the flag now
                 // if that still fails, reset timer
-                if (i->second.flag)
-                {
                     if (flagManager->givePlayerFlagNow(i->first, i->second.flag))
                     {
-                        // i->second.flag = NULL;
-                        flagManager->DelayedFlags.erase(i);
+                        i->second.flag = NULL;
                     }
                     else
                     {
