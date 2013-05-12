@@ -338,7 +338,20 @@ public:
         int oldNumFlags = numEnabledFlags;
         if (numPlayersNeeded() == 0) AnnounceLeaders();
 
-        numPlayers--;
+        if (numPlayers > 0)
+        {
+            numPlayers--;
+        }
+        else
+        {
+            // weird case seen - joined empty server and was told I was player #-2
+            // not sure how this could get off track
+            // might need to call bz_getPlayerCount() instead of maintaining
+            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
+                               "\"%s\" is leaving, but numPlayers is already %d.",
+                               bz_getPlayerCallsign(partData->playerID),
+                               numPlayers);
+        }
         recalcFlags();
 
         AssignedFlags.erase(partData->playerID);
@@ -787,8 +800,9 @@ void GunGame::Event ( bz_EventData *eventData )
     if (eventData->eventType == bz_eTickEvent)
     {
         bz_TickEventData_V1 *tickData = (bz_TickEventData_V1*)eventData;
+        FlagManager::DelayedFlagsType::iterator e = flagManager->DelayedFlags.end();
         for (FlagManager::DelayedFlagsType::iterator i = flagManager->DelayedFlags.begin();
-             i != flagManager->DelayedFlags.end(); ++i)
+             i != e; ++i)
         {
             if (tickData->eventTime > i->second.givetime)
             {
