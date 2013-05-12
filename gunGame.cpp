@@ -129,8 +129,17 @@ private:
                 lastFlag = f;
                 numEnabledFlags++;
                 FlagLevels[f] = numEnabledFlags;
-                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "Flag %3d (slot %u): %s", numEnabledFlags, f, possibleFlags[f].flagName);
             }
+        }
+    }
+
+    void listFlags(int dest=BZ_ALLUSERS)
+    {
+        for (FlagLevelsType::const_iterator it = FlagLevels.begin();
+             it != FlagLevels.end();
+             ++it)
+        {
+            bz_sendTextMessagef(BZ_SERVER, dest, "Flag %3d: %s", it->second, possibleFlags[it->first].flagName);
         }
     }
 
@@ -288,14 +297,20 @@ public:
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                             "\"GunGame Style\" started with %d players %d flags",
                             numPlayers, numFlags);
+                listFlags();
             }
-            else if (oldNumFlags < numFlags)
+            else 
             {
-                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
-                                    "\"GunGame Style\" added %d flags to win...",
-                                    numFlags - oldNumFlags);
-                // adjust scores to map to new flags
-                recalcScores();
+                // game already in progress.  tell new player flag list
+                listFlags(joinData->playerID);
+                if (oldNumFlags < numFlags)
+                {
+                    bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
+                                        "\"GunGame Style\" added %d flags to win...",
+                                        numFlags - oldNumFlags);
+                    // adjust scores to map to new flags
+                    recalcScores();
+                }
             }
             AssignedFlags[joinData->playerID] = firstFlag;
             bz_setPlayerWins(joinData->playerID, 1);
@@ -318,7 +333,6 @@ public:
     // return true if this suspends a game
     bool removePlayer(const bz_PlayerJoinPartEventData_V1 *partData)
     {
-    
         bool end = false;
         bool wasGameOn = gameOn();
         int oldNumFlags = numEnabledFlags;
@@ -515,8 +529,8 @@ public:
 #ifdef PLAYSOUNDS
         bz_sendPlayCustomLocalSound(BZ_ALLUSERS, "flag_lost");
 #endif
-        bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "Ha-Ha!  %s suicided with %s.  %s %s",
-                            victimName, victimFlag,
+        bz_sendTextMessagef(BZ_SERVER, dieData->playerID, "Ha-Ha!  You suicided with %s.  %s %s",
+                            victimFlag,
                             (newFlagNo <= firstFlag) ? "starting over with"
                                                                  : "demoted to",
                             newFlag);
