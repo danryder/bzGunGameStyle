@@ -91,10 +91,18 @@ class FlagManager
 {
 private:
 
+    struct ltstr
+    {
+      bool operator()(const char* s1, const char* s2) const
+      {
+        return strcmp(s1, s2) < 0;
+      }
+    };
+
     typedef map<int, int> AssignedFlagsType;
     typedef map<size_t, int> FlagLevelsType;
-    typedef map<int, int> WinnersListType;
-    typedef multimap<int, int, greater<int> > LeaderboardType;
+    typedef map<const char *, int, ltstr> WinnersListType;
+    typedef multimap<int, const char *, greater<int> > LeaderboardType;
     struct DelayedFlagType{
         DelayedFlagType(double t=0.0, const char *f=NULL)
                : givetime(t), flag(f) {}
@@ -263,6 +271,16 @@ public:
             if (!minPlayers || (f->playersRequired < minPlayers))
                 minPlayers = f->playersRequired;
             f++;
+        }
+    }
+
+    ~FlagManager()
+    {
+        for (WinnersListType::iterator i = WinnersList.begin(); i != WinnersList.end(); ++i)
+        {
+            char *key = const_cast<char *>(i->first);
+            WinnersList.erase(i);
+            free(key);
         }
     }
 
@@ -678,11 +696,11 @@ public:
                 // winner!
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "---===>>> WINNER: %s <<<===---",
                                     killerName);
-                WinnersListType::iterator i = WinnersList.find(killerID);
+                WinnersListType::iterator i = WinnersList.find(killerName);
                 if (i == WinnersList.end())
                 {
                     // first time winning
-                    WinnersList[killerID] = 1;
+                    WinnersList[strdup(killerName)] = 1;
                 }
                 else
                 {
@@ -692,13 +710,13 @@ public:
                 Leaderboard.clear();
                 for (i = WinnersList.begin(); i != WinnersList.end(); ++i)
                 {
-                    Leaderboard.insert(pair<int, int>(i->second, i->first));
+                    Leaderboard.insert(pair<int, const char *>(i->second, i->first));
                 }
                 for (LeaderboardType::const_iterator j = Leaderboard.begin(); j != Leaderboard.end(); ++j)
                 {
                     bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%d wins - %s",
                                         j->first, 
-                                        bz_getPlayerCallsign(j->second));
+                                        j->second);
                 }
 
                 // reset game
