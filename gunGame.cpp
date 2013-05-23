@@ -304,6 +304,8 @@ public:
                             "\"GunGame Style\" started with %d players %d flags",
                             numPlayers, numFlags);
                 listFlags();
+                bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
+                            "Commands: \"flags\", \"winners\", \"leaders\"");
             }
             else 
             {
@@ -497,7 +499,6 @@ public:
 
     void listFlags(int dest=BZ_ALLUSERS)
     {
-        bz_sendTextMessagef(BZ_SERVER, dest, "-= Enabled Flags =-");
         for (FlagLevelsType::const_iterator it = flagLevels.begin();
              it != flagLevels.end();
              ++it)
