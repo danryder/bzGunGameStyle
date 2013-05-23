@@ -102,7 +102,6 @@ private:
     typedef map<int, int> AssignedFlagsType;
     typedef map<size_t, int> FlagLevelsType;
     typedef map<const char *, int, ltstr> WinnersListType;
-    typedef multimap<int, const char *, greater<int> > LeaderboardType;
     struct DelayedFlagType{
         DelayedFlagType(double t=0.0, const char *f=NULL)
                : givetime(t), flag(f) {}
@@ -113,7 +112,6 @@ private:
     AssignedFlagsType AssignedFlags; // flag# assigned by player ID
     FlagLevelsType FlagLevels;       // flag levels of all enabled flags (by flag#)
     WinnersListType WinnersList;     // total wins by player ID
-    LeaderboardType Leaderboard; // sorts winners at end of game
 
     size_t numTotalFlags;        // #flags that could be enabled
     size_t numEnabledFlags;      // #flags actually enabled
@@ -138,16 +136,6 @@ private:
                 numEnabledFlags++;
                 FlagLevels[f] = numEnabledFlags;
             }
-        }
-    }
-
-    void listFlags(int dest=BZ_ALLUSERS)
-    {
-        for (FlagLevelsType::const_iterator it = FlagLevels.begin();
-             it != FlagLevels.end();
-             ++it)
-        {
-            bz_sendTextMessagef(BZ_SERVER, dest, "Flag %3d: %s", it->second, possibleFlags[it->first].flagName);
         }
     }
 
@@ -354,7 +342,7 @@ public:
         bool end = false;
         bool wasGameOn = gameOn();
         int oldNumFlags = numEnabledFlags;
-        if (numPlayersNeeded() == 0) AnnounceLeaders();
+        if (numPlayersNeeded() == 0) AnnounceLeaders(BZ_ALLUSERS);
 
         if (numPlayers > 0)
         {
@@ -493,7 +481,59 @@ public:
         }
     }
 
-    void AnnounceLeaders()
+    void AddWinner(const char *callsign)
+    {
+        WinnersListType::iterator i = WinnersList.find(callsign);
+        if (i == WinnersList.end())
+        {
+            // first time winning
+            WinnersList.insert(pair<const char *, int>(strdup(callsign),1));
+        }
+        else
+        {
+            i->second += 1;
+        }
+    }
+
+    void listFlags(int dest=BZ_ALLUSERS)
+    {
+        bz_sendTextMessagef(BZ_SERVER, dest, "-= Enabled Flags =-");
+        for (FlagLevelsType::const_iterator it = FlagLevels.begin();
+             it != FlagLevels.end();
+             ++it)
+        {
+            bz_sendTextMessagef(BZ_SERVER, dest, "Flag %3d: %s", it->second, possibleFlags[it->first].flagName);
+        }
+    }
+
+    void AnnounceWinners(int dest)
+    {
+        if (!WinnersList.size())
+        {
+            bz_sendTextMessagef(BZ_SERVER, dest, "No wins yet...");
+        }
+        else
+        {
+            bz_sendTextMessagef(BZ_SERVER, dest, "-= S C O R E B O A R D =-");
+            // sort winners by win count
+            typedef multimap<int, const char *, greater<int> > LeaderboardType;
+            LeaderboardType Leaderboard; 
+            Leaderboard.clear();
+            for (WinnersListType::const_iterator i = WinnersList.begin(); i != WinnersList.end(); ++i)
+            {
+                Leaderboard.insert(pair<int, const char *>(i->second, i->first));
+            }
+            for (LeaderboardType::const_iterator j = Leaderboard.begin(); j != Leaderboard.end(); ++j)
+            {
+                bz_sendTextMessagef(BZ_SERVER, dest, "%d win%s - %s",
+                                    j->first, 
+                                    (j->first > 1) ? "s":"",
+                                    j->second);
+            }
+        }
+    }
+
+    void AnnounceLeaders(int dest)
     {
         int maxFlag = -1;
         list<int> quasiWinners;
@@ -527,9 +567,14 @@ public:
             qwinners = qwinners.substr(0, qwinners.length() - 2);
             
             const char *lastFlag = possibleFlags[maxFlag].flagName;
-            bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS,
-                                "A semi-sincere congratulations to: %s with %s",
+            bz_sendTextMessagef(BZ_SERVER, dest,
+                                "Leading the pack: %s with %s",
                                 qwinners.c_str(), lastFlag);
+        }
+        else
+        {
+            bz_sendTextMessagef(BZ_SERVER, dest,
+                                "No leaders yet.  Shoot something!");
         }
     }
 
@@ -696,28 +741,8 @@ public:
                 // winner!
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "---===>>> WINNER: %s <<<===---",
                                     killerName);
-                WinnersListType::iterator i = WinnersList.find(killerName);
-                if (i == WinnersList.end())
-                {
-                    // first time winning
-                    WinnersList[strdup(killerName)] = 1;
-                }
-                else
-                {
-                    i->second += 1;
-                }
-
-                Leaderboard.clear();
-                for (i = WinnersList.begin(); i != WinnersList.end(); ++i)
-                {
-                    Leaderboard.insert(pair<int, const char *>(i->second, i->first));
-                }
-                for (LeaderboardType::const_iterator j = Leaderboard.begin(); j != Leaderboard.end(); ++j)
-                {
-                    bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%d wins - %s",
-                                        j->first, 
-                                        j->second);
-                }
+                AddWinner(killerName);
+                AnnounceWinners(BZ_ALLUSERS);
 
                 // reset game
                 int winnerFlag = AssignedFlags[killerID];
@@ -768,12 +793,42 @@ public:
     }
 };
 
-class GunGame : public bz_Plugin
+class GunGame : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
 private:
     FlagManager *flagManager;
     const char *debuggerIP;
     bool savedHideFlagsOnRadar;
+
+   virtual bool SlashCommand ( int playerID, bz_ApiString command, bz_ApiString message, bz_APIStringList *params )
+   {
+       if (command == "flags")
+       {
+           if (flagManager)
+           {
+               flagManager->listFlags(playerID);
+           }
+       }
+       else if (command == "winners")
+       {
+           if (flagManager)
+           {
+               flagManager->AnnounceWinners(playerID);
+           }
+       }
+       else if (command == "leaders")
+       {
+           if (flagManager)
+           {
+               flagManager->AnnounceLeaders(playerID);
+           }
+       }
+       else
+       {
+           return false;
+       }
+       return true;
+   }
 
 public:
     virtual const char* Name (){return "GunGame";}
@@ -788,13 +843,15 @@ public:
         bz_setBZDBInt("_ggSuicidePenalty", SUICIDEPENALTY, 0, false);
         bz_setBZDBInt("_ggCheatPenalty", CHEATPENALTY, 0, false);
 
+        bz_registerCustomSlashCommand("flags", this);
+        bz_registerCustomSlashCommand("winners", this);
+        bz_registerCustomSlashCommand("leaders", this);
         debuggerIP = config;
         flagManager = new FlagManager();
 
         Register(bz_ePlayerJoinEvent);
         Register(bz_ePlayerPartEvent);
     }
-
     void Cleanup()
     {
         if (flagManager) 
@@ -802,6 +859,9 @@ public:
             delete flagManager;
             flagManager = NULL;
         }
+        bz_removeCustomSlashCommand("flags");
+        bz_removeCustomSlashCommand("winners");
+        bz_removeCustomSlashCommand("leaders");
         bz_Plugin::Cleanup();
         bz_setBZDBBool("_hideFlagsOnRadar", savedHideFlagsOnRadar, 0, false);
     }
