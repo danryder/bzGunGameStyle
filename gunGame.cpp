@@ -109,9 +109,9 @@ private:
         const char *flag;
     };
 
-    AssignedFlagsType AssignedFlags; // flag# assigned by player ID
-    FlagLevelsType FlagLevels;       // flag levels of all enabled flags (by flag#)
-    WinnersListType WinnersList;     // total wins by player ID
+    AssignedFlagsType assignedFlags; // flag# assigned by player ID
+    FlagLevelsType flagLevels;       // flag levels of all enabled flags (by flag#)
+    WinnersListType winnersList;     // total wins by player ID
 
     size_t numTotalFlags;        // #flags that could be enabled
     size_t numEnabledFlags;      // #flags actually enabled
@@ -125,7 +125,7 @@ private:
     {
         firstFlag = -1;
         lastFlag = -1;
-        FlagLevels.clear();
+        flagLevels.clear();
         numEnabledFlags = 0;
         for (size_t f = 0; f < numTotalFlags; ++f)
         {
@@ -134,7 +134,7 @@ private:
                 if (firstFlag < 0) firstFlag = f;
                 lastFlag = f;
                 numEnabledFlags++;
-                FlagLevels[f] = numEnabledFlags;
+                flagLevels[f] = numEnabledFlags;
             }
         }
     }
@@ -143,12 +143,12 @@ private:
     // handle case where a player has a flag now removed from circulation
     void recalcScores()
     {
-        for (AssignedFlagsType::iterator i = AssignedFlags.begin(); i != AssignedFlags.end(); ++i)
+        for (AssignedFlagsType::iterator i = assignedFlags.begin(); i != assignedFlags.end(); ++i)
         {
             int playerID = i->first;
             int flag = i->second;
-            FlagLevelsType::iterator j = FlagLevels.find(flag);
-            if (j != FlagLevels.end())
+            FlagLevelsType::iterator j = flagLevels.find(flag);
+            if (j != flagLevels.end())
             {
                 // current flag was still in the list
                 // just update the score with the new position
@@ -160,8 +160,8 @@ private:
                 // replace it with preceeding valid flag
                 int decr = 0;
                 int newFlagNo = getPrevFlag(flag, decr, 1);
-                j = FlagLevels.find(newFlagNo);
-                if (j != FlagLevels.end())
+                j = flagLevels.find(newFlagNo);
+                if (j != flagLevels.end())
                 {
                     i->second = newFlagNo; // update what flag the player *should* have
                     bz_setPlayerWins(playerID, j->second);
@@ -240,7 +240,7 @@ private:
 public:
     // members accessed in plugin class
     typedef map<int, DelayedFlagType> DelayedFlagsType;
-    DelayedFlagsType DelayedFlags;
+    DelayedFlagsType delayedFlags;
     size_t numPlayers;
     int debuggerID;
 
@@ -264,10 +264,10 @@ public:
 
     ~FlagManager()
     {
-        for (WinnersListType::iterator i = WinnersList.begin(); i != WinnersList.end(); ++i)
+        for (WinnersListType::iterator i = winnersList.begin(); i != winnersList.end(); ++i)
         {
             char *key = const_cast<char *>(i->first);
-            WinnersList.erase(i);
+            winnersList.erase(i);
             free(key);
         }
     }
@@ -298,7 +298,7 @@ public:
             int numFlags = numEnabledFlags;
             if (!wasGameOn)
             {
-                Begin();
+                beginGG();
                 start = true;
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                             "\"GunGame Style\" started with %d players %d flags",
@@ -318,7 +318,7 @@ public:
                     recalcScores();
                 }
             }
-            AssignedFlags[joinData->playerID] = firstFlag;
+            assignedFlags[joinData->playerID] = firstFlag;
             bz_setPlayerWins(joinData->playerID, 1);
             bz_setPlayerLosses(joinData->playerID, 0);
             bz_setPlayerTKs(joinData->playerID, 0);
@@ -326,7 +326,7 @@ public:
         else
         {
             // no game yet
-            AssignedFlags[joinData->playerID] = -1;
+            assignedFlags[joinData->playerID] = -1;
             int needed = numPlayersNeeded();
             bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                                 "\"GunGame Style\" awaiting %d more player%s...",
@@ -342,7 +342,7 @@ public:
         bool end = false;
         bool wasGameOn = gameOn();
         int oldNumFlags = numEnabledFlags;
-        if (numPlayersNeeded() == 0) AnnounceLeaders(BZ_ALLUSERS);
+        if (numPlayersNeeded() == 0) announceLeaders(BZ_ALLUSERS);
 
         if (numPlayers > 0)
         {
@@ -360,7 +360,7 @@ public:
         }
         recalcFlags();
 
-        AssignedFlags.erase(partData->playerID);
+        assignedFlags.erase(partData->playerID);
         if (!gameOn())
         {
             if (wasGameOn)
@@ -368,7 +368,7 @@ public:
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                                    "\"GunGame Style\" suspended - thanks a lot \"%s\"!",
                                    bz_getPlayerCallsign(partData->playerID));
-                End();
+                endGG();
                 end = true;
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, 
                                    "\"GunGame Style\" needs one more player to restart...");
@@ -399,8 +399,8 @@ public:
     void givePlayerFlagDelayed(int playerID, const char *flagName)
     {
         double now = bz_getCurrentTime();
-        DelayedFlags[playerID].flag = flagName;
-        DelayedFlags[playerID].givetime = now + DELAYSEC;
+        delayedFlags[playerID].flag = flagName;
+        delayedFlags[playerID].givetime = now + DELAYSEC;
     }
 
     bool givePlayerFlagNow(int playerID, const char *flagName)
@@ -446,7 +446,7 @@ public:
          bz_freePlayerRecord(pr);
     }
 
-    void Begin()
+    void beginGG()
     {
         // new game -- pass out flags to anyone spawned
         const char *firstFlagName = possibleFlags[firstFlag].flagName;
@@ -455,7 +455,7 @@ public:
 #endif
             
         bz_BasePlayerRecord *pr = NULL;
-        for (AssignedFlagsType::iterator i = AssignedFlags.begin(); i != AssignedFlags.end(); ++i)
+        for (AssignedFlagsType::iterator i = assignedFlags.begin(); i != assignedFlags.end(); ++i)
         {
             int playerID = i->first;
             i->second = firstFlag;
@@ -466,9 +466,9 @@ public:
         }
     }
 
-    void End()
+    void endGG()
     {
-        for (AssignedFlagsType::iterator i = AssignedFlags.begin(); i != AssignedFlags.end(); ++i)
+        for (AssignedFlagsType::iterator i = assignedFlags.begin(); i != assignedFlags.end(); ++i)
         {
             // reset flag and scores
             int playerID = i->first;
@@ -481,13 +481,13 @@ public:
         }
     }
 
-    void AddWinner(const char *callsign)
+    void addWinner(const char *callsign)
     {
-        WinnersListType::iterator i = WinnersList.find(callsign);
-        if (i == WinnersList.end())
+        WinnersListType::iterator i = winnersList.find(callsign);
+        if (i == winnersList.end())
         {
             // first time winning
-            WinnersList.insert(pair<const char *, int>(strdup(callsign),1));
+            winnersList.insert(pair<const char *, int>(strdup(callsign),1));
         }
         else
         {
@@ -498,17 +498,17 @@ public:
     void listFlags(int dest=BZ_ALLUSERS)
     {
         bz_sendTextMessagef(BZ_SERVER, dest, "-= Enabled Flags =-");
-        for (FlagLevelsType::const_iterator it = FlagLevels.begin();
-             it != FlagLevels.end();
+        for (FlagLevelsType::const_iterator it = flagLevels.begin();
+             it != flagLevels.end();
              ++it)
         {
             bz_sendTextMessagef(BZ_SERVER, dest, "Flag %3d: %s", it->second, possibleFlags[it->first].flagName);
         }
     }
 
-    void AnnounceWinners(int dest)
+    void announceWinners(int dest)
     {
-        if (!WinnersList.size())
+        if (!winnersList.size())
         {
             bz_sendTextMessagef(BZ_SERVER, dest, "No wins yet...");
         }
@@ -519,7 +519,7 @@ public:
             typedef multimap<int, const char *, greater<int> > LeaderboardType;
             LeaderboardType Leaderboard; 
             Leaderboard.clear();
-            for (WinnersListType::const_iterator i = WinnersList.begin(); i != WinnersList.end(); ++i)
+            for (WinnersListType::const_iterator i = winnersList.begin(); i != winnersList.end(); ++i)
             {
                 Leaderboard.insert(pair<int, const char *>(i->second, i->first));
             }
@@ -533,11 +533,11 @@ public:
         }
     }
 
-    void AnnounceLeaders(int dest)
+    void announceLeaders(int dest)
     {
         int maxFlag = -1;
         list<int> quasiWinners;
-        for (AssignedFlagsType::const_iterator i = AssignedFlags.begin(); i != AssignedFlags.end(); ++i)
+        for (AssignedFlagsType::const_iterator i = assignedFlags.begin(); i != assignedFlags.end(); ++i)
         {
             int playerID = i->first;
             int flag = i->second;
@@ -580,8 +580,8 @@ public:
 
     const char *getAssignedFlag(const int playerID)
     {
-        AssignedFlagsType::const_iterator i = AssignedFlags.find(playerID);
-        if (i == AssignedFlags.end())
+        AssignedFlagsType::const_iterator i = assignedFlags.find(playerID);
+        if (i == assignedFlags.end())
         {
             return NULL;
         }
@@ -592,7 +592,7 @@ public:
     void handleSuicide(const bz_PlayerDieEventData_V1 *dieData)
     {
         const char *victimName = bz_getPlayerCallsign(dieData->playerID);
-        int victimFlagNo = AssignedFlags[dieData->playerID];
+        int victimFlagNo = assignedFlags[dieData->playerID];
         const char *victimFlag = possibleFlags[victimFlagNo].flagName;
 
         int decr = 0;
@@ -610,12 +610,12 @@ public:
                             (newFlagNo <= firstFlag) ? "starting over with"
                                                                  : "demoted to",
                             newFlag);
-        AssignedFlags[dieData->playerID] = newFlagNo;
+        assignedFlags[dieData->playerID] = newFlagNo;
 
         // reduce player score on suicide
         if (decr)
         {
-            bz_setPlayerWins(dieData->playerID, FlagLevels[newFlagNo]);
+            bz_setPlayerWins(dieData->playerID, flagLevels[newFlagNo]);
         }
     }
 
@@ -626,8 +626,8 @@ public:
         int victimID = dieData->playerID;
         const char *victimName = bz_getPlayerCallsign(victimID);
         const char *killerName = bz_getPlayerCallsign(killerID);
-        int victimFlagNo = AssignedFlags[victimID];
-        int killerFlagNo = AssignedFlags[dieData->killerID];
+        int victimFlagNo = assignedFlags[victimID];
+        int killerFlagNo = assignedFlags[dieData->killerID];
         const char *victimFlag = possibleFlags[victimFlagNo].flagName;
         const char *killerFlag = possibleFlags[killerFlagNo].flagName;
 
@@ -670,10 +670,10 @@ public:
                             const char *newFlag = possibleFlags[newFlagNo].flagName;
                             bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "%s killed %s ... WITHOUT holding %s!  Booted to %s",
                                                 killerName, victimName, killerFlag, newFlag);
-                            AssignedFlags[killerID] = newFlagNo;
+                            assignedFlags[killerID] = newFlagNo;
                             // negate cheater score increase
                             // and roll it back 
-                            bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
+                            bz_setPlayerWins(killerID, flagLevels[newFlagNo] - 1);
                             // if cheater died, do nothing - new flag will be given on spawn
                             replaceFlagIfAlive(killerID, newFlag, "suspected cheat", true);
                         }
@@ -690,7 +690,7 @@ public:
                                     victimName, killerName, killerFlag);
             }
 
-            int killerLevel = FlagLevels[killerFlagNo];
+            int killerLevel = flagLevels[killerFlagNo];
             int maxLevel = numEnabledFlags;
             int remainLevels = maxLevel - killerLevel;
 
@@ -723,12 +723,12 @@ public:
                 {
                     bz_sendTextMessagef(BZ_SERVER, debuggerID,
                                     "-> ATTENTION: %s made a legit kill. new flag is %d which is level %d",
-                                    killerName, newFlagNo, FlagLevels[newFlagNo]);
+                                    killerName, newFlagNo, flagLevels[newFlagNo]);
                 }
-                AssignedFlags[killerID] = newFlagNo;
+                assignedFlags[killerID] = newFlagNo;
 
                 // set score to new level (minus one to account for pending increment)
-                bz_setPlayerWins(killerID, FlagLevels[newFlagNo] - 1);
+                bz_setPlayerWins(killerID, flagLevels[newFlagNo] - 1);
                 const char *newFlag = possibleFlags[newFlagNo].flagName;
                 bz_sendTextMessagef(BZ_SERVER, killerID, "\"Upgraded\" from %s to %s (%d/%d)", killerFlag, newFlag, killerLevel+1, maxLevel);
 #ifdef PLAYSOUNDS
@@ -741,14 +741,14 @@ public:
                 // winner!
                 bz_sendTextMessagef(BZ_SERVER, BZ_ALLUSERS, "---===>>> WINNER: %s <<<===---",
                                     killerName);
-                AddWinner(killerName);
-                AnnounceWinners(BZ_ALLUSERS);
+                addWinner(killerName);
+                announceWinners(BZ_ALLUSERS);
 
                 // reset game
-                int winnerFlag = AssignedFlags[killerID];
+                int winnerFlag = assignedFlags[killerID];
                 int firstFlag = getNextFlag(-1);
                 const char *firstFlagName = possibleFlags[firstFlag].flagName;
-                for (AssignedFlagsType::iterator i = AssignedFlags.begin(); i!= AssignedFlags.end(); ++i)
+                for (AssignedFlagsType::iterator i = assignedFlags.begin(); i!= assignedFlags.end(); ++i)
                 {
                     int playerID = i->first;
                     int flag = i->second;
@@ -813,14 +813,14 @@ private:
        {
            if (flagManager)
            {
-               flagManager->AnnounceWinners(playerID);
+               flagManager->announceWinners(playerID);
            }
        }
        else if (command == "leaders")
        {
            if (flagManager)
            {
-               flagManager->AnnounceLeaders(playerID);
+               flagManager->announceLeaders(playerID);
            }
        }
        else
@@ -878,8 +878,8 @@ void GunGame::Event ( bz_EventData *eventData )
     if (eventData->eventType == bz_eTickEvent)
     {
         bz_TickEventData_V1 *tickData = (bz_TickEventData_V1*)eventData;
-        FlagManager::DelayedFlagsType::iterator e = flagManager->DelayedFlags.end();
-        for (FlagManager::DelayedFlagsType::iterator i = flagManager->DelayedFlags.begin();
+        FlagManager::DelayedFlagsType::iterator e = flagManager->delayedFlags.end();
+        for (FlagManager::DelayedFlagsType::iterator i = flagManager->delayedFlags.begin();
              i != e; ++i)
         {
             if (i->second.flag)
