@@ -55,6 +55,12 @@ These are custom BZDB variables that can be set in game in order to change the p
  * _ggJacked  - if enabled, server announces all kills.  defaults false
 
 ## Notes
+Sometimes players will get kicked by the server for "wrong shot type".  This is not within the plugin but as a result of what it does and that not matching up with what the server expects.
+
+I've never seen this in LAN play but in the month or two this ran on planet mofo it happened enough to find a fix.
+
+Comment out line 3628 in bzfs/bzfs.cxx and rebuild if it becomes a problem.
+
 
 ## License
 
