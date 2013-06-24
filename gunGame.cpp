@@ -35,6 +35,7 @@ using namespace std;
 #define DETECTCHEAT 1
 #define CHEATPENALTY 3
 #define SUICIDEPENALTY 1
+#define REQUIRECRUSH 3
 
 // enable this if playing sounds from a plugin crashing clients is fixed
 // #define PLAYSOUNDS
@@ -931,7 +932,7 @@ void GunGame::Event ( bz_EventData *eventData )
                     }
                 }
                 // also if SR - end game situation - disable gun in same way
-                else if((flagManager->numPlayers > 2) && (pr->currentFlag == "SteamRoller (+SR)"))
+                else if((flagManager->numPlayers >= REQUIRECRUSH) && (pr->currentFlag == "SteamRoller (+SR)"))
                 {
                     shotData->type = "PZ";
                     shotData->changed = true;
