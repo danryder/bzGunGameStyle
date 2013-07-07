@@ -797,6 +797,7 @@ private:
     FlagManager *flagManager;
     const char *debuggerIP;
     bool savedHideFlagsOnRadar;
+    bool savedShotMismatch;
 
    virtual bool SlashCommand ( int playerID, bz_ApiString command, bz_ApiString message, bz_APIStringList *params )
    {
@@ -1063,6 +1064,8 @@ void GunGame::Event ( bz_EventData *eventData )
          
         if (flagManager->addPlayer(joinData))
         {
+            savedShotMismatch = bz_getShotMismatch();
+            bz_setShotMismatch(false);
             Register(bz_ePlayerSpawnEvent);
             Register(bz_ePlayerDieEvent);
             Register(bz_eFlagDroppedEvent);
@@ -1076,6 +1079,7 @@ void GunGame::Event ( bz_EventData *eventData )
         bz_PlayerJoinPartEventData_V1 *partData = (bz_PlayerJoinPartEventData_V1*)eventData;
         if (flagManager->removePlayer(partData))
         {
+            bz_setShotMismatch(savedShotMismatch);
             Remove(bz_ePlayerSpawnEvent);
             Remove(bz_ePlayerDieEvent);
             Remove(bz_eFlagDroppedEvent);
