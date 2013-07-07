@@ -37,6 +37,14 @@ using namespace std;
 #define SUICIDEPENALTY 1
 #define REQUIRECRUSH 3
 
+// hide SR bullets completely from others or make them PZ
+// ineffective either way, but PZ can fool others
+#ifdef SHOWENDSHOTS
+#define ENDSHOTTYPE "PZ"
+#else
+#define ENDSHOTTYPE "DELETE"
+#endif
+
 // enable this if playing sounds from a plugin crashing clients is fixed
 // #define PLAYSOUNDS
 
@@ -901,15 +909,15 @@ void GunGame::Event ( bz_EventData *eventData )
         {
             if(!pr->currentFlag.size())
             {
-                // if no flag - change bullet to PZ so its harmless to others
+                // if no flag - change bullet to PZ 
                 // not sure how well this actually works
                 // so we catch ill-gotten kills elsewhere and dispense justice there
-                shotData->type = "PZ";
                 shotData->changed = true;
+                shotData->type = "PZ";
                 if (bz_getBZDBBool("_ggDebug"))
                 {
                     bz_sendTextMessagef(BZ_SERVER, flagManager->debuggerID,
-                                        ">>>>>>> %s fired a shot... but has no flag.. converted to PZ <<<<<",
+                                        ">>>>>>> %s fired a shot... but has no flag - made it PZ <<<<<",
                                         shootingPlayer);
                 }
             }
@@ -921,21 +929,21 @@ void GunGame::Event ( bz_EventData *eventData )
                 {
                     // shooter had a flag...  was it the right one?
                     // I've never seen this actually happen
-                    shotData->type = "PZ";
                     shotData->changed = true;
+                    shotData->type = "PZ";
                     if (bz_getBZDBBool("_ggDebug"))
                     {
                         bz_sendTextMessagef(BZ_SERVER, 
                                         flagManager->debuggerID,
-                                        ">>>>>>> %s shot type: %s should have been: %s converted to PZ <<<<<<",
+                                        ">>>>>>> %s shot type: %s should have been: %s - made it PZ <<<<<<",
                                         shootingPlayer, shotData->type.c_str(), shouldHave);
                     }
                 }
                 // also if SR - end game situation - disable gun in same way
                 else if((flagManager->numPlayers >= REQUIRECRUSH) && (pr->currentFlag == "SteamRoller (+SR)"))
                 {
-                    shotData->type = "PZ";
                     shotData->changed = true;
+                    shotData->type = ENDSHOTTYPE;
                     bz_sendTextMessagef(BZ_SERVER, shotData->playerID, "Shots don't work; You gotta crush someone to win");
                 }
             }
